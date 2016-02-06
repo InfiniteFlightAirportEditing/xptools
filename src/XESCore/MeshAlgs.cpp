@@ -43,10 +43,6 @@
 #include "MeshSimplify.h"
 #include "NetHelpers.h"
 #include "Zoning.h"	// for urban cheat table.
-#if APL && !defined(__MACH__)
-#define __DEBUGGING__
-#include "XUtils.h"
-#endif
 #if OPENGL_MAP
 #include "GISTool_Globals.h"
 #endif
@@ -419,7 +415,7 @@ static bool	load_match_file(const char * path, mesh_match_t& outLeft, mesh_match
 				dest->vertices.push_back(mesh_match_vertex_t());
 				sscanf(buf, "VT %lf, %lf, %lf", &x, &y, &dest->vertices.back().height);
 				dest->vertices.back().loc = Point_2(x,y);
-				dest->vertices.back().buddy = NULL;
+				dest->vertices.back().buddy = CDT::Vertex_handle();
 			}
 			if (MATCH(buf, "VC"))
 			{
@@ -427,7 +423,7 @@ static bool	load_match_file(const char * path, mesh_match_t& outLeft, mesh_match
 				dest->vertices.push_back(mesh_match_vertex_t());
 				sscanf(buf, "VC %lf, %lf, %lf", &x, &y, &dest->vertices.back().height);
 				dest->vertices.back().loc = Point_2(x,y);
-				dest->vertices.back().buddy = NULL;
+				dest->vertices.back().buddy = CDT::Vertex_handle();
 			}
 			if (fgets(buf, sizeof(buf), fi) == NULL) goto bail;
 			sscanf(buf, "VBC %d", &count);
@@ -541,7 +537,7 @@ void	match_border(CDT& ioMesh, mesh_match_t& ioBorder, int side_num)
 
 		// Go through each non-assigned vertex.
 		for (vector<mesh_match_vertex_t>::iterator pts = ioBorder.vertices.begin(); pts != ioBorder.vertices.end(); ++pts)
-		if (pts->buddy == NULL)
+		if (pts->buddy == CDT::Vertex_handle())
 		{
 			// Find the nearest slave for it by decreasing distance.
 			for (map<double, CDT::Vertex_handle>::iterator sl = slaves.begin(); sl != slaves.end(); ++sl)
@@ -574,9 +570,9 @@ void	match_border(CDT& ioMesh, mesh_match_t& ioBorder, int side_num)
 	}
 
 	// Step 3.  Go through all unmatched masters and insert them directly into the mesh.
-	CDT::Face_handle	nearf = NULL;
+	CDT::Face_handle	nearf = CDT::Face_handle();
 	for (vector<mesh_match_vertex_t>::iterator pts = ioBorder.vertices.begin(); pts != ioBorder.vertices.end(); ++pts)
-	if (pts->buddy == NULL)
+	if (pts->buddy == CDT::Vertex_handle())
 	{	
 		//printf("Found no buddy for: %lf,%lf\n", CGAL::to_double(pts->loc.x()), CGAL::to_double(pts->loc.y()));
 		pts->buddy = ioMesh.insert(CDT::Point(CGAL::to_double(pts->loc.x()), CGAL::to_double(pts->loc.y())), nearf);
@@ -1079,7 +1075,7 @@ void	SetTerrainForConstraints(CDT& ioMesh, const DEMGeo& allPts)
 	{
 		ffi->info().terrain = terrain_Natural;
 		ffi->info().feature = NO_VALUE;
-		ffi->info().orig_face == Face_handle();
+		ffi->info().orig_face = Face_handle();
 
 		for(int n = 0; n < 3; ++n)
 		if(ffi->is_constrained(n))
@@ -1586,13 +1582,6 @@ void	TriangulateMesh(Pmwx& inMap, CDT& outMesh, DEMGeoMap& inDEMs, const char * 
 		char	fname_top[512];
 
 		string border_loc = mesh_folder;
-#if APL && !defined(__MACH__)
-		string	appP;
-		AppPath(appP);
-		string::size_type b = appP.rfind(':');
-		appP.erase(b+1);
-		border_loc = appP + border_loc;
-#endif
 
 		make_cache_file_path(border_loc.c_str(),deriv.mWest-1, deriv.mSouth,"border",fname_lef);
 		make_cache_file_path(border_loc.c_str(),deriv.mWest+1, deriv.mSouth,"border",fname_rgt);
@@ -2592,13 +2581,6 @@ void	AssignLandusesToMesh(	DEMGeoMap& inDEMs,
 		char	fname[512];
 
 		string border_loc = mesh_folder;
-#if APL && !defined(__MACH__)
-		string	appP;
-		AppPath(appP);
-		string::size_type b = appP.rfind(':');
-		appP.erase(b+1);
-		border_loc = appP + border_loc;
-#endif
 
 		make_cache_file_path(border_loc.c_str(),west, south,"border",fname);
 
@@ -2785,7 +2767,7 @@ double	HeightWithinTri(CDT& inMesh, CDT::Face_handle f, CDT::Point in)
 double	MeshHeightAtPoint(CDT& inMesh, double inLon, double inLat, int hint_id)
 {
 	if (inMesh.number_of_faces() < 1) return DEM_NO_DATA;
-	CDT::Face_handle	f = NULL;
+	CDT::Face_handle	f = CDT::Face_handle();
 	int	n;
 	CDT::Locate_type lt;
 	f = inMesh.locate_cache(CDT::Point(inLon, inLat), lt, n, hint_id);
@@ -2844,7 +2826,7 @@ int	CalcMeshError(CDT& mesh, DEMGeo& elev, float& out_min, float& out_max, float
 				   Segment2(last_tri_loc[2],last_tri_loc[0]).on_right_side(ll))
 				{
 
-					CDT::Face_handle	f = NULL;
+					CDT::Face_handle	f = CDT::Face_handle();
 					int	n;
 					CDT::Locate_type lt;
 					f = mesh.locate(CDT::Point(ll.x(), ll.y()), lt, n, last_tri);
